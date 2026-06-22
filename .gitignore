@@ -1,0 +1,15 @@
+# Secrets — nunca commitar
+.env
+
+# Dependencies
+node_modules/
+.opencode/node_modules/
+.opencode/package.json
+.opencode/package-lock.json
+
+# OpenCode local state
+.opencode/cache/
+
+# OS
+.DS_Store
+Thumbs.db
