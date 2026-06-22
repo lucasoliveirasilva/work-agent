@@ -12,12 +12,16 @@ Hoje o foco inicial é o **Azure DevOps**, mas a arquitetura foi pensada para **
 Work Agent (OpenCode)
     │
     ├── Módulos disponíveis          ← commands em .opencode/commands/
-    │      ├── subtasks              fluxo completo de subtasks
+    │      ├── subtasks              quebra de tasks em subtasks
     │      ├── listar-tasks          listagem de tasks sem filhos
-    │      └── sugerir-subtasks      sugestão sem escrita no Azure
+    │      ├── sugerir-subtasks      sugestão de subtasks
+    │      ├── evidencia             doc de evidência (fluxo completo)
+    │      ├── listar-tasks-dev      tasks em dev/review/PR
+    │      └── gerar-evidencia       gera doc para um ID
     │
     ├── Agentes                      ← .opencode/agents/
-    │      └── ado-subtasks          agente padrão (Azure DevOps)
+    │      ├── ado-subtasks          subtasks no Azure DevOps
+    │      └── ado-evidence          documentos de evidência
     │
     └── Integrações (MCP)
            └── azure-devops          Microsoft @azure-devops/mcp
@@ -45,14 +49,45 @@ Fluxo típico do módulo `/subtasks`:
 4. Sugerir subtasks práticas
 5. Criar no Azure DevOps somente após aprovação explícita
 
+### Azure DevOps — Documentos de Evidência
+
+Gera docs de evidência a partir de tasks em andamento, preenchendo um template com dados extraídos do Azure DevOps e salvando na pasta do Drive em **`{root}/{ano}/{quarter}`** (ex.: `...\Evidências\2026\Q2`).
+
+| Módulo | Command | Descrição |
+|--------|---------|-----------|
+| **Evidência (fluxo completo)** | `/evidencia` | Lista tasks em dev/review → escolhe → pré-visualiza → aprova → cria doc no Drive |
+| **Listar tasks em andamento** | `/listar-tasks-dev` | Só lista work items ativos (desenvolvimento, review, PR…) |
+| **Gerar evidência** | `/gerar-evidencia <id>` | Gera doc para um work item específico (com dry-run antes) |
+
+Fluxo típico do módulo `/evidencia`:
+
+1. Buscar tasks suas em estados de andamento (configurável)
+2. Exibir lista numerada para escolha
+3. Extrair da task: URL, título, responsável, estado, descrição, PRs vinculados…
+4. Pré-visualizar documento, **destino no Drive (ano/quarter)** e **fallback local**
+5. Confirmar a pasta de destino com o usuário antes de criar
+6. Tentar gravar no Drive; se EPERM, gerar em `.output/evidence/` e sinalizar
+
+**Nomenclatura:** `User Story 170349 - [Back] Título da task.docx`  
+(padrão `{Tipo} {ID} - {Título}` — o `:` após o ID vira ` - ` no Windows)
+
+**Template:** `templates/evidencia.template.docx` com placeholders `[[CABECALHO]]`, `[[URL_TASK]]`, etc. (veja `templates/README.md`)
+
+Scripts CLI (sem OpenCode):
+
+```powershell
+npm run evidence:list
+npm run evidence:generate -- 12345 --dry-run
+npm run evidence:generate -- 12345
+```
+
 ### Próximos módulos (planejado)
 
 Espaço reservado para evoluções do fluxo de trabalho, por exemplo:
 
 - Triagem de PRs vinculados a work items
 - Resumo de sprint / status de itens em risco
-- Atualização em lote de campos ou estados
-- Integrações além do Azure DevOps
+- Upload direto via Google Drive MCP (sem pasta sincronizada)
 
 > Para adicionar um módulo: crie `.opencode/commands/<nome>.md` com frontmatter (`description`, `agent`) e o prompt do fluxo.
 
@@ -97,6 +132,13 @@ Use modelos compatíveis com assinatura ChatGPT, como `openai/gpt-5.4`. Evite `g
 | `AZDO_ORG_URL` | URL da org (opcional) | `https://dev.azure.com/contoso` |
 | `AZDO_PROJECT` | Projeto padrão | `Fabrikam` |
 | `AZDO_TEAM` | Time padrão | `Fabrikam Team` |
+| `EVIDENCE_DRIVE_ROOT` | Pasta principal no Drive (`/ano/quarter`) | `G:/Drives compartilhados/.../Evidencias` |
+| `EVIDENCE_OUTPUT_ROOT` | Fallback local se EPERM (opcional) | `.output/evidence` |
+| `EVIDENCE_TEMPLATE_PATH` | Template Word | `templates/evidencia.template.docx` |
+| `EVIDENCE_AMBIENTE_TESTE` | Ambiente no doc (opcional) | `UAT` |
+| `EVIDENCE_YEAR` | Override do ano (opcional) | `2026` |
+| `EVIDENCE_QUARTER` | Override do quarter (opcional) | `Q2` |
+| `EVIDENCE_ACTIVE_STATES` | Estados "em andamento" (opcional) | `Active,In Progress,In Review` |
 
 O script `load-env.ps1` converte o PAT para o formato exigido pelo MCP (`PERSONAL_ACCESS_TOKEN` em base64).
 
@@ -116,11 +158,12 @@ No TUI, digite o command do módulo desejado:
 
 ```
 /subtasks
-/listar-tasks
-/sugerir-subtasks 12345
+/evidencia
+/listar-tasks-dev
+/gerar-evidencia 12345
 ```
 
-O agente padrão é `ado-subtasks`. Troque o modelo com `/models` se necessário.
+Use **Tab** para alternar entre agentes (`ado-subtasks`, `ado-evidence`) ou especifique o agente no command. Troque o modelo com `/models` se necessário.
 
 ### Validar integração MCP
 
@@ -138,14 +181,29 @@ work-agent/
 ├── package.json               # Dependência @azure-devops/mcp
 ├── .env                       # Credenciais (não commitar)
 ├── .env.example
+├── config/
+│   └── evidence.json          # Estados e padrões do módulo evidência
+├── templates/
+│   ├── evidencia.template.docx
+│   └── README.md
+├── lib/
+│   ├── ado-client.mjs         # Cliente REST Azure DevOps
+│   └── evidence/              # Geração de docs
 ├── .opencode/
-│   ├── agents/                # Agentes especializados por domínio
-│   │   └── ado-subtasks.md
-│   └── commands/              # Módulos expostos como /commands
+│   ├── agents/
+│   │   ├── ado-subtasks.md
+│   │   └── ado-evidence.md
+│   └── commands/
 │       ├── subtasks.md
 │       ├── listar-tasks.md
-│       └── sugerir-subtasks.md
+│       ├── sugerir-subtasks.md
+│       ├── evidencia.md
+│       ├── listar-tasks-dev.md
+│       └── gerar-evidencia.md
 └── scripts/
+    ├── evidence/
+    │   ├── list-tasks.mjs
+    │   └── generate-doc.mjs
     ├── load-env.ps1
     ├── start.ps1
     └── test-mcp.ps1
@@ -186,6 +244,11 @@ Após clonar o repositório, ajuste:
 | MCP lento na 1ª vez | Aguarde o `npm install`; o binário local evita timeout do `npx` |
 | Criação bloqueada | Aprove no chat e confirme o popup do OpenCode |
 | Time/projeto errado | Ajuste `.env` e `opencode.json` → `mcp.azure-devops.environment` |
+| Lista de evidência vazia | Ajuste estados em `config/evidence.json` ou `EVIDENCE_ACTIVE_STATES` |
+| `EVIDENCE_DRIVE_ROOT não configurado` | Defina a pasta de referência do Drive no `.env` |
+| `EPERM` ao salvar | Fallback automático para `.output/evidence/` — copie manualmente para o Drive |
+| Arquivo já existe | Normal — use `--force` só se quiser substituir |
+| Template docx não preenche | Confirme placeholders `{{CAMPO}}` — veja `templates/README.md` |
 
 ## Segurança
 

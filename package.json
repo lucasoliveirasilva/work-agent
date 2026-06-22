@@ -2,12 +2,16 @@
   "name": "work-agent",
   "version": "1.0.0",
   "private": true,
-  "description": "Agente OpenCode para criar subtasks no Azure DevOps",
+  "description": "Agente OpenCode para automação do fluxo de trabalho (Azure DevOps, evidências, etc.)",
   "scripts": {
     "start": "powershell -ExecutionPolicy Bypass -File ./scripts/start.ps1",
-    "test:mcp": "powershell -ExecutionPolicy Bypass -File ./scripts/test-mcp.ps1"
+    "test:mcp": "powershell -ExecutionPolicy Bypass -File ./scripts/test-mcp.ps1",
+    "evidence:list": "node scripts/evidence/list-tasks.mjs",
+    "evidence:generate": "node scripts/evidence/generate-doc.mjs"
   },
   "dependencies": {
-    "@azure-devops/mcp": "^2.7.0"
+    "@azure-devops/mcp": "^2.7.0",
+    "docxtemplater": "^3.65.0",
+    "pizzip": "^3.2.0"
   }
 }

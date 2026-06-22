@@ -1,0 +1,27 @@
+{
+  "activeStates": [
+    "New",
+    "Active",
+    "In Progress",
+    "Development",
+    "Doing",
+    "In Review",
+    "Code Review",
+    "In PR",
+    "Pull Request",
+    "Resolved"
+  ],
+  "workItemTypes": ["User Story", "Task", "Bug", "Product Backlog Item"],
+  "filenamePattern": "{tipo} {id}: {titulo}.docx",
+  "placeholders": {
+    "CABECALHO": "_derived.cabecalho",
+    "SQUAD": "_derived.squad",
+    "QUARTER_LABEL": "_derived.quarterLabel",
+    "RESPONSAVEL": "System.AssignedTo",
+    "TIPO_TESTE": "_derived.tipoTeste",
+    "AMBIENTE_TESTE": "_env.EVIDENCE_AMBIENTE_TESTE",
+    "VERSAO_TESTES": "",
+    "URL_TASK": "_computed.url",
+    "FUNCIONALIDADE": ""
+  }
+}

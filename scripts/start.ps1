@@ -14,6 +14,6 @@ if (-not (Test-Path $nodeModules)) {
 }
 
 Write-Host "Iniciando OpenCode no projeto work-agent..." -ForegroundColor Cyan
-Write-Host "Comandos disponíveis: /subtasks | /listar-tasks | /sugerir-subtasks <id>" -ForegroundColor DarkGray
+Write-Host "Comandos: /subtasks | /evidencia | /listar-tasks-dev | /gerar-evidencia <id>" -ForegroundColor DarkGray
 
 opencode @args
