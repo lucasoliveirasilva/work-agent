@@ -1,9 +1,9 @@
 ---
-description: Listar apenas tasks atribuídas a mim sem subtasks criadas
+description: Listar tasks abertas atribuídas a mim com contagem de subtasks
 agent: ado-subtasks
 ---
 
-Liste minhas work items ativas no **projeto e time configurados no ambiente** que **não possuem subtasks filhas**.
+Execute `node scripts/subtasks/list-tasks.mjs` e exiba a tabela com: #, ID, Tipo, Estado, **Subtasks** (quantidade), Título.
 
-Mostre tabela com: #, ID, Tipo, Título, Estado.
 Não sugira nem crie subtasks — apenas a listagem.
+Se vazia, oriente ajustar `config/subtasks.json` ou `SUBTASKS_ACTIVE_STATES`.

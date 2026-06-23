@@ -10,8 +10,7 @@ node_modules/
 # OpenCode local state
 .opencode/cache/
 
-# Test output
-.tmp-evidence/
+# Saídas geradas localmente
 .output/
 
 # OS

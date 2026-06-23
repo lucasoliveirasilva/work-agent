@@ -1,0 +1,26 @@
+{
+  "boardColumnField": "System.BoardColumn",
+  "columns": {
+    "readyForDev": "Pronto para dev",
+    "inDev": "Desenvolvimento/Teste",
+    "inPr": "Em PR",
+    "blocked": "Blocked",
+    "deploying": "Em subida",
+    "delivered": "Entregue"
+  },
+  "queryColumns": [
+    "Pronto para dev",
+    "Desenvolvimento/Teste",
+    "Em PR",
+    "Blocked",
+    "Em subida",
+    "Entregue"
+  ],
+  "workItemTypes": ["User Story", "Task", "Bug", "Product Backlog Item"],
+  "auditEvidenceField": "Custom.AuditEvidence",
+  "mainBranches": ["main", "master"],
+  "heuristicMinScore": 0.35,
+  "mergedPrLookbackDays": 30,
+  "maxBranchPages": 5,
+  "branchPageSize": 100
+}

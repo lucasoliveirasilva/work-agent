@@ -1,0 +1,32 @@
+﻿# Segredos e credenciais
+.env
+.env.*
+!.env.example
+
+# Dependências (muito ruído para o índice)
+node_modules/
+.opencode/node_modules/
+
+# Locks e caches
+package-lock.json
+.opencode/package-lock.json
+.opencode/package.json
+.opencode/cache/
+
+# Saídas geradas localmente
+.output/
+
+# Binários e artefatos grandes
+templates/*.docx
+*.docx
+
+# Git
+.git/
+
+# SO
+.DS_Store
+Thumbs.db
+
+# Logs e temporários
+*.log
+npm-debug.log*

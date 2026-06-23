@@ -1,0 +1,65 @@
+{
+  "activeStates": [
+    "Pronto para dev",
+    "Desenvolvimento/Teste",
+    "Em PR",
+    "Em subida",
+    "New",
+    "Active",
+    "Committed",
+    "In Progress",
+    "Development",
+    "Doing",
+    "In Review",
+    "Code Review",
+    "In PR",
+    "Pull Request",
+    "Resolved"
+  ],
+  "workItemTypes": ["User Story", "Task", "Bug", "Product Backlog Item"],
+  "childWorkItemType": "Task",
+  "standardSubtasks": [
+    {
+      "title": "Testes unitários",
+      "description": "Implementar e validar testes unitários cobrindo a alteração.",
+      "matchPatterns": [
+        "teste unitário",
+        "testes unitários",
+        "unit test",
+        "unitário",
+        "unitarios"
+      ]
+    },
+    {
+      "title": "Publicação em UAT",
+      "description": "Publicar a alteração no ambiente UAT e validar deploy.",
+      "matchPatterns": ["publicação em uat", "publicacao em uat", "deploy uat", "uat"]
+    },
+    {
+      "title": "Coleta de evidência",
+      "description": "Gerar e anexar documento de evidência de testes.",
+      "matchPatterns": [
+        "coleta de evidência",
+        "coleta de evidencia",
+        "evidência",
+        "evidencia",
+        "evidence"
+      ]
+    },
+    {
+      "title": "Abertura de GMUD",
+      "description": "Abrir GMUD para subida da alteração.",
+      "matchPatterns": ["abertura de gmud", "abrir gmud", "gmud"]
+    },
+    {
+      "title": "Acompanhamento de GMUD",
+      "description": "Acompanhar execução e conclusão da GMUD até a subida.",
+      "matchPatterns": [
+        "acompanhamento de gmud",
+        "acompanhar gmud",
+        "follow-up gmud",
+        "follow up gmud"
+      ]
+    }
+  ]
+}

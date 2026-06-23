@@ -6,8 +6,12 @@
   "scripts": {
     "start": "powershell -ExecutionPolicy Bypass -File ./scripts/start.ps1",
     "test:mcp": "powershell -ExecutionPolicy Bypass -File ./scripts/test-mcp.ps1",
+    "subtasks:list": "node scripts/subtasks/list-tasks.mjs",
+    "subtasks:get": "node scripts/subtasks/get-task.mjs",
     "evidence:list": "node scripts/evidence/list-tasks.mjs",
-    "evidence:generate": "node scripts/evidence/generate-doc.mjs"
+    "evidence:generate": "node scripts/evidence/generate-doc.mjs",
+    "triage:analyze": "node scripts/triage/analyze.mjs --save",
+    "triage:apply": "node scripts/triage/apply.mjs"
   },
   "dependencies": {
     "@azure-devops/mcp": "^2.7.0",

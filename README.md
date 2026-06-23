@@ -12,22 +12,24 @@ Hoje o foco inicial é o **Azure DevOps**, mas a arquitetura foi pensada para **
 Work Agent (OpenCode)
     │
     ├── Módulos disponíveis          ← commands em .opencode/commands/
-    │      ├── subtasks              quebra de tasks em subtasks
-    │      ├── listar-tasks          listagem de tasks sem filhos
-    │      ├── sugerir-subtasks      sugestão de subtasks
+    │      ├── subtasks              subtasks faltantes (com anti-duplicação)
+    │      ├── listar-tasks          tasks abertas + qtd subtasks
+    │      ├── sugerir-subtasks      sugestão sem criar
     │      ├── evidencia             doc de evidência (fluxo completo)
     │      ├── listar-tasks-dev      tasks em dev/review/PR
-    │      └── gerar-evidencia       gera doc para um ID
+    │      ├── gerar-evidencia       gera doc para um ID
+    │      └── triagem                triagem de status ADO + GitHub
     │
     ├── Agentes                      ← .opencode/agents/
     │      ├── ado-subtasks          subtasks no Azure DevOps
-    │      └── ado-evidence          documentos de evidência
+    │      ├── ado-evidence          documentos de evidência
+    │      └── ado-github-triage     triagem de status ADO + GitHub
     │
     └── Integrações (MCP)
            └── azure-devops          Microsoft @azure-devops/mcp
 ```
 
-Cada **módulo** é um command (`/nome-do-modulo`) com prompt e comportamento próprios. Novos módulos entram como arquivos em `.opencode/commands/` — e, quando necessário, agentes dedicados em `.opencode/agents/`.
+Cada **módulo** segue o padrão: `config/<modulo>.json` + `lib/<modulo>/` + `scripts/<modulo>/` + command e agente em `.opencode/`.
 
 ## Módulos disponíveis
 
@@ -37,17 +39,22 @@ Automatiza a quebra de work items em subtasks com apoio da IA.
 
 | Módulo | Command | Descrição |
 |--------|---------|-----------|
-| **Subtasks (fluxo completo)** | `/subtasks` | Lista tasks suas sem subtasks → você escolhe → IA sugere → pede aprovação → cria no Azure |
-| **Listar tasks** | `/listar-tasks` | Apenas lista work items atribuídos a você que ainda não têm filhos |
-| **Sugerir subtasks** | `/sugerir-subtasks <id>` | Analisa um work item e propõe subtasks **sem criar** nada no Azure |
+| **Subtasks (fluxo completo)** | `/subtasks` | Lista tasks abertas → escolhe → sugere faltantes (sem duplicar) → aprova → cria |
+| **Listar tasks** | `/listar-tasks` | Lista tasks abertas com contagem de subtasks |
+| **Sugerir subtasks** | `/sugerir-subtasks <id>` | Sugere subtasks faltantes para um ID (sem criar) |
 
 Fluxo típico do módulo `/subtasks`:
 
-1. Buscar tasks no board sem subtasks criadas
-2. Exibir lista numerada para escolha
-3. Analisar descrição e contexto da task selecionada
-4. Sugerir subtasks práticas
-5. Criar no Azure DevOps somente após aprovação explícita
+1. `node scripts/subtasks/list-tasks.mjs` — todas as tasks abertas + coluna **Subtasks**
+2. Escolher task na tabela
+3. `node scripts/subtasks/get-task.mjs <id>` — subtasks existentes + contexto
+4. Sugerir **apenas faltantes** (padrão: testes unitários, UAT, evidência, GMUD abertura/acompanhamento + específicas da task)
+5. Criar no Azure DevOps somente após aprovação (MCP)
+
+```powershell
+npm run subtasks:list
+npm run subtasks:get -- 172777
+```
 
 ### Azure DevOps — Documentos de Evidência
 
@@ -81,15 +88,35 @@ npm run evidence:generate -- 12345 --dry-run
 npm run evidence:generate -- 12345
 ```
 
-### Próximos módulos (planejado)
+### Azure DevOps + GitHub — Triagem de status
 
-Espaço reservado para evoluções do fluxo de trabalho, por exemplo:
+Correlaciona tasks suas com PRs/branches no GitHub e sugere correções de status no board.
 
-- Triagem de PRs vinculados a work items
+| Módulo | Command | Descrição |
+|--------|---------|-----------|
+| **Triagem (fluxo completo)** | `/triagem` | Analisa → tabela de sugestões → aprova → aplica no ADO |
+
+**Regras:** sem PR → manter em dev; PR aberto para `main`/`master` → Em PR; PR mergeado → Em subida ou Entregue (conforme `Custom.AuditEvidence`).
+
+Correlação: ID na branch (primário) + heurística título/branch (fallback).
+
+```powershell
+npm run triage:analyze
+npm run triage:apply -- --plan .output/triage/plan-....json --ids 123456
+```
+
+Configure `GITHUB_*` no `.env` e `config/triage.json` (`queryColumns`, `columns`, `auditEvidenceField`).
+
+A triagem usa **`System.BoardColumn`** (coluna do board), não `System.State`.
+
+### Evoluções planejadas
+
 - Resumo de sprint / status de itens em risco
 - Upload direto via Google Drive MCP (sem pasta sincronizada)
 
-> Para adicionar um módulo: crie `.opencode/commands/<nome>.md` com frontmatter (`description`, `agent`) e o prompt do fluxo.
+> Padrão de novo módulo: `config/<modulo>.json` + `lib/<modulo>/` + `scripts/<modulo>/` + `.opencode/commands/` + `.opencode/agents/ado-<modulo>.md`
+
+**Saídas locais:** `.output/evidence/`, `.output/triage/` (gitignored).
 
 ## Pré-requisitos
 
@@ -139,6 +166,10 @@ Use modelos compatíveis com assinatura ChatGPT, como `openai/gpt-5.4`. Evite `g
 | `EVIDENCE_YEAR` | Override do ano (opcional) | `2026` |
 | `EVIDENCE_QUARTER` | Override do quarter (opcional) | `Q2` |
 | `EVIDENCE_ACTIVE_STATES` | Estados "em andamento" (opcional) | `Active,In Progress,In Review` |
+| `GITHUB_TOKEN` | Token GitHub (triagem) | `ghp_...` |
+| `GITHUB_ORG` | Organização GitHub | `minha-org` |
+| `GITHUB_USERNAME` | Seu usuário (opcional — detecta via API) | `dev` |
+| `GITHUB_REPOS` | Repos para analisar | `org/repo1,org/repo2` |
 
 O script `load-env.ps1` converte o PAT para o formato exigido pelo MCP (`PERSONAL_ACCESS_TOKEN` em base64).
 
@@ -159,11 +190,12 @@ No TUI, digite o command do módulo desejado:
 ```
 /subtasks
 /evidencia
+/triagem
 /listar-tasks-dev
 /gerar-evidencia 12345
 ```
 
-Use **Tab** para alternar entre agentes (`ado-subtasks`, `ado-evidence`) ou especifique o agente no command. Troque o modelo com `/models` se necessário.
+Use **Tab** para alternar entre agentes (`ado-subtasks`, `ado-evidence`, `ado-github-triage`) ou especifique o agente no command.
 
 ### Validar integração MCP
 
@@ -177,36 +209,35 @@ Deve exibir `azure-devops connected`.
 
 ```
 work-agent/
-├── opencode.json              # Config global: MCP, modelo, agente padrão
-├── package.json               # Dependência @azure-devops/mcp
-├── .env                       # Credenciais (não commitar)
-├── .env.example
+├── opencode.json
+├── package.json
+├── .env / .env.example
 ├── config/
-│   └── evidence.json          # Estados e padrões do módulo evidência
+│   ├── subtasks.json
+│   ├── evidence.json
+│   └── triage.json
 ├── templates/
 │   ├── evidencia.template.docx
 │   └── README.md
 ├── lib/
-│   ├── ado-client.mjs         # Cliente REST Azure DevOps
-│   └── evidence/              # Geração de docs
-├── .opencode/
-│   ├── agents/
-│   │   ├── ado-subtasks.md
-│   │   └── ado-evidence.md
-│   └── commands/
-│       ├── subtasks.md
-│       ├── listar-tasks.md
-│       ├── sugerir-subtasks.md
-│       ├── evidencia.md
-│       ├── listar-tasks-dev.md
-│       └── gerar-evidencia.md
-└── scripts/
-    ├── evidence/
-    │   ├── list-tasks.mjs
-    │   └── generate-doc.mjs
-    ├── load-env.ps1
-    ├── start.ps1
-    └── test-mcp.ps1
+│   ├── env.mjs
+│   ├── ado-client.mjs
+│   ├── github-client.mjs
+│   ├── subtasks/
+│   ├── evidence/
+│   └── triage/
+├── scripts/
+│   ├── subtasks/list-tasks.mjs, get-task.mjs
+│   ├── evidence/list-tasks.mjs, generate-doc.mjs
+│   ├── triage/analyze.mjs, apply.mjs, discover-audit-field.mjs
+│   ├── start.ps1, load-env.ps1, test-mcp.ps1
+│   └── patch-evidence-template.mjs
+├── .output/                   # saídas locais (gitignored)
+│   ├── evidence/
+│   └── triage/
+└── .opencode/
+    ├── agents/                # ado-subtasks, ado-evidence, ado-github-triage
+    └── commands/
 ```
 
 ## Arquitetura técnica
@@ -214,14 +245,14 @@ work-agent/
 ```
 OpenCode (TUI)
     │
-    ├── Agente ado-subtasks
-    │      ├── Orquestra módulos de work items
-    │      ├── Raciocina sobre descrições e contexto
-    │      └── Exige aprovação antes de escrita
+    ├── Agentes (por módulo)
+    │   ├── ado-subtasks      → CLI list + MCP criação
+    │   ├── ado-evidence      → CLI generate
+    │   └── ado-github-triage → CLI analyze/apply
     │
     └── MCP azure-devops
-           ├── Leitura: my_work_items, get_work_item, query_by_wiql
-           └── Escrita: add_child_work_items (com confirmação)
+           ├── Leitura: work items, WIQL
+           └── Escrita: subtasks (com confirmação)
 ```
 
 Ferramentas de **criação e alteração** no Azure DevOps usam permissão `ask` — o OpenCode solicita confirmação antes de executar.
@@ -244,11 +275,13 @@ Após clonar o repositório, ajuste:
 | MCP lento na 1ª vez | Aguarde o `npm install`; o binário local evita timeout do `npx` |
 | Criação bloqueada | Aprove no chat e confirme o popup do OpenCode |
 | Time/projeto errado | Ajuste `.env` e `opencode.json` → `mcp.azure-devops.environment` |
-| Lista de evidência vazia | Ajuste estados em `config/evidence.json` ou `EVIDENCE_ACTIVE_STATES` |
+| Lista de subtasks vazia | Ajuste `config/subtasks.json` ou `SUBTASKS_ACTIVE_STATES` |
+| Lista de evidência vazia | Ajuste `config/evidence.json` ou `EVIDENCE_ACTIVE_STATES` |
+| Lista de triagem vazia | Ajuste `queryColumns` em `config/triage.json` — use `node scripts/triage/debug-states.mjs` |
 | `EVIDENCE_DRIVE_ROOT não configurado` | Defina a pasta de referência do Drive no `.env` |
 | `EPERM` ao salvar | Fallback automático para `.output/evidence/` — copie manualmente para o Drive |
 | Arquivo já existe | Normal — use `--force` só se quiser substituir |
-| Template docx não preenche | Confirme placeholders `{{CAMPO}}` — veja `templates/README.md` |
+| Template docx não preenche | Placeholders `[[CAMPO]]` — veja `templates/README.md` |
 
 ## Segurança
 

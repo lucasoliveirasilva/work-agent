@@ -1,0 +1,108 @@
+# Work Agent — regras do projeto (pt-BR)
+
+## O que é este projeto
+
+Agente local de automação de fluxo de trabalho com **OpenCode** + **Node.js (ESM)**.
+Integra **Azure DevOps** (work items) e **GitHub** (PRs/branches). A IA assiste rotinas repetitivas e **sempre pede aprovação explícita** antes de alterar sistemas externos.
+
+Responda ao usuário em **português brasileiro**.
+
+## Arquitetura
+
+```
+work-agent/
+├── .opencode/
+│   ├── agents/          # Personas e permissões (ado-subtasks, ado-evidence, ado-github-triage)
+│   └── commands/        # Commands OpenCode (/subtasks, /evidencia, /triagem…)
+├── lib/
+│   ├── env.mjs          # loadEnv(), requireEnv() — lê .env
+│   ├── ado-client.mjs   # REST Azure DevOps (WIQL, work items, update state)
+│   ├── github-client.mjs
+│   ├── subtasks/        # Listagem de tasks sem filhos
+│   ├── evidence/        # Geração de .docx (docxtemplater)
+│   └── triage/          # Correlação ADO↔GitHub + regras de status
+├── scripts/             # CLI por módulo: subtasks/, evidence/, triage/
+├── config/              # subtasks.json, evidence.json, triage.json
+├── templates/           # evidencia.template.docx + README dos placeholders
+├── opencode.json        # MCP azure-devops — deve bater com .env (org/projeto/time)
+└── .env                 # Segredos — NUNCA commitar
+```
+
+**Padrão de módulo novo:** `config/<modulo>.json` + `lib/<modulo>/` + `scripts/<modulo>/` + `.opencode/commands/<nome>.md` + (opcional) `.opencode/agents/ado-<nome>.md`.
+
+**Prefixo `ado-`:** Azure DevOps (ex.: `ado-evidence`, `ado-github-triage`).
+
+## Módulos existentes
+
+| Command | Agente | Scripts principais |
+|---------|--------|-------------------|
+| `/subtasks`, `/listar-tasks` | ado-subtasks | `scripts/subtasks/list-tasks.mjs`, `get-task.mjs` + MCP |
+| `/evidencia`, `/gerar-evidencia` | ado-evidence | `scripts/evidence/*` |
+| `/triagem` | ado-github-triage | `scripts/triage/analyze.mjs`, `apply.mjs` |
+
+**Saídas locais:** tudo em `.output/` (`evidence/`, `triage/`).
+
+## Regras de comportamento (críticas)
+
+1. **Nunca commitar** `.env`, tokens ou credenciais.
+2. **Nunca alterar** Azure DevOps, GitHub ou Drive **sem aprovação explícita** do usuário.
+3. **Nunca criar arquivos de teste** na pasta do Drive corporativo (`EVIDENCE_DRIVE_ROOT`).
+4. **Minimize o escopo** das mudanças — não refatore código não relacionado à tarefa.
+5. Scripts CLI devem suportar **`--dry-run`** quando houver efeito colateral.
+6. Preferir **reutilizar** `lib/ado-client.mjs`, `loadEnv()` e padrões dos módulos existentes.
+
+## Azure DevOps
+
+- Variáveis: `AZDO_PAT`, `AZDO_ORG`, `AZDO_ORG_URL`, `AZDO_PROJECT`, `AZDO_TEAM`
+- Org real costuma ser `dotzmkt` / projeto `Tribos Dotz` (valores reais ficam no `.env` local)
+- `opencode.json` ainda pode ter mocks (`contoso`) no repo público — alinhar com `.env` local para MCP
+- Campo de evidência de auditoria: **`Custom.AuditEvidence`** (não `AuditEvidenceLink`)
+
+## Evidências (.docx)
+
+- Template: `templates/evidencia.template.docx`
+- Placeholders docxtemplater: **`[[NOME]]`** — NÃO usar `{{}}` (quebra com export Google Docs→Word)
+- Delimitadores em `lib/evidence/generator.mjs`: `{ start: "[[", end: "]]" }`
+- Drive: estrutura `{EVIDENCE_DRIVE_ROOT}/{ano}/{quarter}` (ex.: `2026/Q2`)
+- Gravação: tenta Drive primeiro; se **EPERM**, fallback em **`.output/evidence/`**
+- `VERSAO_TESTES` e `FUNCIONALIDADE` devem ficar **vazios** (preenchimento manual)
+- Duplicatas: verifica nome exato ou prefixo `{Tipo} {ID}` antes de criar
+
+## Triagem de status (ADO + GitHub)
+
+- **Coluna do board** = `System.BoardColumn` (ex.: Em PR, Blocked) — **não** usar `System.State` (ex.: Active)
+- Config: `config/triage.json` — `queryColumns`, `columns`, `auditEvidenceField`
+- Env GitHub: `GITHUB_TOKEN`, `GITHUB_REPOS`, `GITHUB_ORG`, `GITHUB_USERNAME` (opcional)
+- Correlação: **ID na branch** (primário) + **heurística** título↔branch (fallback)
+- Fluxo: `analyze.mjs --save` → usuário aprova → `apply.mjs --plan ... --ids ...`
+- Estados validados: colunas do board (`System.BoardColumn`), não `System.State`
+- PR mergeado + sem `Custom.AuditEvidence` → Em subida; com evidência → Entregue
+
+## Subtasks
+
+- Config: `config/subtasks.json` — estados ativos + `standardSubtasks` (testes unitários, UAT, evidência, GMUD)
+- Lista **todas** as tasks abertas com coluna `SUBTASK_COUNT`
+- `get-task.mjs <id>` — subtasks existentes antes de sugerir
+- **Anti-duplicação:** comparar títulos existentes com padrões (`matchPatterns`) antes de sugerir
+- Criação via MCP após aprovação
+
+- **ESM** (`.mjs`), `import`/`export`, Node 20+
+- Env: `import { loadEnv, requireEnv } from "../env.mjs"`
+- Config JSON em `config/` — sem secrets
+- Saída CLI em pt-BR, tabelas markdown quando listar itens
+- Nomes de arquivo Windows: sanitizar com `lib/evidence/utils.mjs` (`:` → ` - `)
+
+## O que NÃO indexar / não ler sem necessidade
+
+Ver `.cursorignore`. Em especial: `node_modules/`, `.env`, `.output/`, `*.docx` binários, locks.
+
+## Comandos úteis
+
+```powershell
+.\scripts\start.ps1
+npm run subtasks:list
+npm run subtasks:get -- <id>
+npm run evidence:list
+npm run evidence:generate -- <id> --dry-run
+npm run triage:analyze
+```
